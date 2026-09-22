@@ -823,3 +823,19 @@ form{display:flex;flex-direction:column;gap:14px}
   .login-card{padding:24px 17px 30px}
   .login-card-head h2{font-size:22px}
 }
+
+
+.login-demo-note{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  padding:10px 11px;
+  border-radius:9px;
+  background:#eff6ff;
+  border:1px solid #dbeafe;
+  color:#475569;
+  font-size:9px;
+  line-height:1.45;
+}
+.login-demo-note svg{flex:0 0 auto;color:#2563eb;margin-top:1px}
+.login-demo-note strong{color:#1d4ed8}
