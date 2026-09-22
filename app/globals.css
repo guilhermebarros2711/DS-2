@@ -135,6 +135,27 @@ nav button.active:before{
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px;gap:18px}
 header p{margin:0;color:#8a96a8;font-size:12px;font-weight:600}
 h1{margin:3px 0 0;font-size:29px;letter-spacing:-.65px}
+.header-actions{display:flex;align-items:center;gap:10px}
+.account-chip{
+  display:flex;align-items:center;gap:9px;
+  padding:5px 6px 5px 7px;
+  background:#fff;border:1px solid #dce2eb;border-radius:11px;
+  box-shadow:0 2px 8px #0f172a08;
+}
+.account-avatar{
+  width:32px;height:32px;border-radius:9px;
+  display:grid;place-items:center;
+  background:#eff6ff;color:#2563eb;
+}
+.account-avatar.admin{background:#eef2ff;color:#4f46e5}
+.account-copy{display:flex;flex-direction:column;min-width:92px}
+.account-copy strong{font-size:10px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.account-copy span{font-size:8px;color:#8a96a8;font-weight:700}
+.logout-btn{
+  width:30px;height:30px;border:0;border-radius:8px;
+  display:grid;place-items:center;background:#f8fafc;color:#64748b;cursor:pointer;
+}
+.logout-btn:hover{background:#fef2f2;color:#dc2626}
 .refresh,.primary,.secondary,.icon-btn,.close-btn,.hero-action,.text-button{
   border:0;
   cursor:pointer;
@@ -460,6 +481,13 @@ form{display:flex;flex-direction:column;gap:14px}
 }
 
 @media(max-width:760px){
+  .login-page{padding:16px}
+  .login-shell{grid-template-columns:1fr;min-height:0;border-radius:22px}
+  .login-showcase{min-height:250px;padding:25px}
+  .login-message{margin:54px 0 20px}
+  .login-message h1{font-size:32px}
+  .login-feature-grid{display:none}
+  .login-card{padding:30px 25px}
   .cards{grid-template-columns:repeat(2,1fr)}
   .toolbar{align-items:flex-start;flex-direction:column}
   .toolbar-actions{width:100%;flex-wrap:wrap}
@@ -506,10 +534,15 @@ form{display:flex;flex-direction:column;gap:14px}
     left:11px;right:11px;top:auto;bottom:-7px;width:auto;height:3px;border-radius:4px 4px 0 0;
   }
   .content{padding:20px 14px 88px}
-  header{margin-bottom:19px}
+  header{margin-bottom:19px;align-items:flex-start}
   h1{font-size:25px}
+  .header-actions{gap:6px}
   .refresh{font-size:0;padding:9px}
   .refresh svg{margin:0}
+  .account-chip{padding:4px}
+  .account-copy{display:none}
+  .account-avatar{width:30px;height:30px}
+  .logout-btn{width:28px;height:28px}
   .cards{grid-template-columns:1fr 1fr;gap:10px}
   .card{padding:14px;min-height:76px}
   .cardicon{width:38px;height:38px}
@@ -530,6 +563,182 @@ form{display:flex;flex-direction:column;gap:14px}
 }
 
 @media(max-width:390px){
+  .login-page{padding:0;background:#fff}
+  .login-shell{border:0;border-radius:0;min-height:100vh}
+  .login-showcase{min-height:220px;border-radius:0 0 26px 26px}
+  .login-message{margin:42px 0 8px}
+  .login-message h1{font-size:29px}
+  .login-card{padding:27px 21px 34px}
   .cards{grid-template-columns:1fr}
   .card{min-height:70px}
 }
+
+
+.auth-loading{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  background:
+    radial-gradient(circle at 15% 15%,#dbeafe 0 9%,transparent 10%),
+    radial-gradient(circle at 85% 85%,#e0e7ff 0 8%,transparent 9%),
+    #f5f7fb;
+}
+.auth-loading-mark{
+  width:58px;height:58px;border-radius:18px;
+  display:grid;place-items:center;color:#fff;
+  background:linear-gradient(145deg,#3b82f6,#1d4ed8);
+  box-shadow:0 18px 42px #2563eb38;
+}
+
+.login-page{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:32px;
+  background:
+    radial-gradient(circle at 10% 10%,#dbeafe 0 10%,transparent 11%),
+    radial-gradient(circle at 90% 86%,#e0e7ff 0 9%,transparent 10%),
+    linear-gradient(180deg,#f8fafc,#eef3fb);
+}
+.login-shell{
+  width:min(980px,100%);
+  min-height:610px;
+  display:grid;
+  grid-template-columns:1.08fr .92fr;
+  background:#fff;
+  border:1px solid #e5eaf1;
+  border-radius:28px;
+  overflow:hidden;
+  box-shadow:0 28px 80px #0f172a1a;
+}
+.login-showcase{
+  position:relative;
+  overflow:hidden;
+  padding:34px;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  background:
+    radial-gradient(circle at 80% 16%,#60a5fa66 0 12%,transparent 13%),
+    linear-gradient(145deg,#172554 0%,#1d4ed8 52%,#3b82f6 100%);
+}
+.login-showcase:before{
+  content:"";
+  position:absolute;
+  width:380px;height:380px;border-radius:50%;
+  border:1px solid #ffffff20;
+  right:-170px;top:70px;
+  box-shadow:0 0 0 55px #ffffff08,0 0 0 110px #ffffff05;
+}
+.login-brand{display:flex;align-items:center;gap:11px;position:relative;z-index:1}
+.login-brand>div:last-child{display:flex;flex-direction:column}
+.login-brand strong{font-size:15px}
+.login-brand span{font-size:9px;opacity:.65}
+.login-logo{
+  position:relative;
+  width:43px;height:43px;border-radius:13px;
+  display:grid;place-items:center;
+  background:#ffffff17;border:1px solid #ffffff28;
+  backdrop-filter:blur(8px);
+}
+.login-logo>span{
+  position:absolute;right:-5px;bottom:-5px;
+  min-width:20px;height:20px;padding:0 4px;
+  border-radius:7px;background:#fff;color:#1d4ed8;
+  display:grid;place-items:center;font-size:8px;font-weight:900;
+  border:2px solid #1d4ed8;
+}
+.login-message{margin:auto 0 44px;max-width:430px;position:relative;z-index:1}
+.login-kicker{
+  display:flex;align-items:center;gap:6px;
+  font-size:9px;font-weight:850;letter-spacing:1.25px;opacity:.75;
+}
+.login-message h1{
+  color:#fff;
+  margin:10px 0 8px;
+  font-size:42px;
+  line-height:1.04;
+  letter-spacing:-1.3px;
+}
+.login-message p{margin:0;max-width:390px;font-size:13px;line-height:1.55;opacity:.8}
+.login-feature-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:9px;
+  position:relative;z-index:1;
+}
+.login-feature-grid>div{
+  min-height:78px;padding:13px;border-radius:13px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  background:#ffffff10;border:1px solid #ffffff16;
+  backdrop-filter:blur(8px);
+}
+.login-feature-grid span{font-size:10px;font-weight:800}
+
+.login-card{
+  padding:44px 42px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  background:#fff;
+}
+.login-card-head>span{
+  color:#2563eb;font-size:9px;font-weight:900;letter-spacing:1.25px;
+}
+.login-card-head h2{margin:5px 0 5px;font-size:26px;letter-spacing:-.6px}
+.login-card-head p{margin:0;color:#8a96a8;font-size:11px}
+.login-form{margin:26px 0 22px;gap:13px}
+.login-field{display:flex;flex-direction:column;gap:6px}
+.login-field>label{font-size:10px;font-weight:800;color:#64748b}
+.login-input{
+  min-height:44px;
+  display:flex;align-items:center;gap:9px;
+  padding:0 11px;
+  border:1px solid #dce2eb;
+  border-radius:10px;
+  color:#8a96a8;background:#fff;
+  transition:border-color .18s ease,box-shadow .18s ease;
+}
+.login-input:focus-within{border-color:#60a5fa;box-shadow:0 0 0 3px #dbeafe}
+.login-input input{
+  flex:1;min-width:0;
+  border:0;outline:0;background:transparent;
+  color:#172033;font-size:12px;padding:11px 0;
+}
+.login-input input::placeholder{color:#a5afbd}
+.password-toggle{
+  width:29px;height:29px;border:0;border-radius:7px;
+  display:grid;place-items:center;background:transparent;color:#7b879a;cursor:pointer;
+}
+.password-toggle:hover{background:#f3f6fa;color:#334155}
+.login-error{
+  padding:10px 11px;border-radius:9px;
+  border:1px solid #fecaca;background:#fef2f2;
+  color:#b91c1c;font-size:10px;font-weight:700;
+}
+.login-submit{
+  margin-top:3px;
+  min-height:44px;
+  border:0;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  color:#fff;background:#2563eb;
+  font-weight:800;font-size:12px;cursor:pointer;
+  box-shadow:0 8px 18px #2563eb24;
+}
+.login-submit:hover{background:#1d4ed8;box-shadow:0 10px 24px #2563eb30}
+.login-submit:disabled{opacity:.65;cursor:wait}
+.login-role-note{
+  display:grid;
+  grid-template-columns:34px 1fr;
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-top:1px solid #eef1f5;
+}
+.role-icon{
+  width:32px;height:32px;border-radius:9px;
+  display:grid;place-items:center;
+  background:#eff6ff;color:#2563eb;
+}
+.role-icon.admin{background:#eef2ff;color:#4f46e5}
+.login-role-note>div:last-child{display:flex;flex-direction:column;gap:1px}
+.login-role-note strong{font-size:10px}
+.login-role-note span{font-size:9px;color:#8a96a8}
