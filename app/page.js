@@ -861,19 +861,19 @@ function LoginScreen({onLogin}){
         <div className="login-card-head">
           <span>ACESSO</span>
           <h2>Entrar na biblioteca</h2>
-          <p>Use seu usuário ou e-mail cadastrado.</p>
+          <p>Modo demonstração: o domínio do e-mail define o tipo de acesso.</p>
         </div>
 
         <form className="login-form" onSubmit={submit}>
           <div className="login-field">
-            <label>Usuário ou e-mail</label>
+            <label>E-mail de acesso</label>
             <div className="login-input">
               <AtSign size={17}/>
               <input
                 autoComplete="username"
                 value={login}
                 onChange={e=>setLogin(e.target.value)}
-                placeholder="Seu usuário"
+                placeholder="ex.: admin@gmail.com"
               />
             </div>
           </div>
@@ -904,11 +904,11 @@ function LoginScreen({onLogin}){
 
         <div className="login-role-note">
           <div className="role-icon admin"><ShieldCheck size={16}/></div>
-          <div><strong>Administrador</strong><span>Gerencia acervo, usuários e empréstimos.</span></div>
+          <div><strong>Administrador • @gmail.com</strong><span>Gerencia acervo, usuários e empréstimos. Qualquer senha preenchida.</span></div>
         </div>
         <div className="login-role-note">
           <div className="role-icon"><UserRound size={16}/></div>
-          <div><strong>Usuário</strong><span>Acompanha seus próprios registros.</span></div>
+          <div><strong>Usuário • @email.com</strong><span>Acompanha seus próprios registros. Qualquer senha preenchida.</span></div>
         </div>
       </section>
     </div>
