@@ -54,6 +54,40 @@ function normalizeStatus(status=''){
   return String(status).trim().toLowerCase();
 }
 
+function isLoanReturned(loan){
+  const status=normalizeStatus(loan?.status);
+  return Boolean(loan?.data_devolucao)||['devolvido','finalizado'].includes(status);
+}
+
+function isLoanOverdue(loan){
+  if(isLoanReturned(loan)) return false;
+  if(normalizeStatus(loan?.status)==='atrasado') return true;
+  const due=loan?.data_prevista_devolucao;
+  if(!due) return false;
+  const today=new Date();
+  const localToday=[
+    today.getFullYear(),
+    String(today.getMonth()+1).padStart(2,'0'),
+    String(today.getDate()).padStart(2,'0')
+  ].join('-');
+  return String(due).slice(0,10)<localToday;
+}
+
+function localIsoDate(date=new Date()){
+  return [
+    date.getFullYear(),
+    String(date.getMonth()+1).padStart(2,'0'),
+    String(date.getDate()).padStart(2,'0')
+  ].join('-');
+}
+
+function addDaysIso(days){
+  const date=new Date();
+  date.setHours(12,0,0,0);
+  date.setDate(date.getDate()+days);
+  return localIsoDate(date);
+}
+
 function statusClass(status=''){
   const s=normalizeStatus(status);
   if(['atrasado','pendente','não pago','nao pago','vencido','cancelado'].some(x=>s.includes(x))) return 'danger';
@@ -129,6 +163,8 @@ export default function Home(){
   const [saving,setSaving]=useState(false);
   const [formError,setFormError]=useState('');
   const [notice,setNotice]=useState('');
+  const [loanFilter,setLoanFilter]=useState('todos');
+  const [loanUser,setLoanUser]=useState('');
 
   async function load(){
     setLoading(true);
@@ -147,10 +183,24 @@ export default function Home(){
   useEffect(()=>{load()},[]);
 
   const rows=data[tab]||[];
-  const filtered=rows.filter(row=>JSON.stringify(row).toLowerCase().includes(q.toLowerCase()));
+  const filtered=rows.filter(row=>{
+    if(tab==='emprestimos'){
+      const returned=isLoanReturned(row);
+      if(loanFilter==='abertos'&&returned) return false;
+      if(loanFilter==='devolvidos'&&!returned) return false;
+      if(loanFilter==='atrasados'&&!isLoanOverdue(row)) return false;
+      if(loanUser&&String(row.id_usuario)!==String(loanUser)) return false;
+    }
+    const raw=JSON.stringify(row).toLowerCase();
+    const readable=Object.entries(row)
+      .map(([key,val])=>displayValue(key,val,data))
+      .join(' ')
+      .toLowerCase();
+    return (raw+' '+readable).includes(q.toLowerCase());
+  });
   const loans=data.emprestimos||[];
-  const active=loans.filter(x=>!['devolvido','finalizado'].includes(normalizeStatus(x.status))).length;
-  const overdue=loans.filter(x=>normalizeStatus(x.status)==='atrasado').length;
+  const active=loans.filter(x=>!isLoanReturned(x)).length;
+  const overdue=loans.filter(isLoanOverdue).length;
   const pending=(data.multas||[]).filter(x=>!['paga','pago'].includes(normalizeStatus(x.status))).length;
   const editable=tab==='livros'||tab==='usuarios';
 
@@ -166,8 +216,12 @@ export default function Home(){
     setFormError('');
     if(tab==='livros'){
       setForm({titulo:'',autor:'',quantidade:'1',preco:'',id_categoria:'',id_editora:''});
-    }else{
+    }else if(tab==='usuarios'){
       setForm({nome:'',email:'',usuario:'',senha:''});
+    }else if(tab==='emprestimos'){
+      setForm({id_usuario:'',id_livro:''});
+    }else{
+      return;
     }
     setModal({table:tab,mode:'new'});
   }
@@ -193,6 +247,70 @@ export default function Home(){
     e.preventDefault();
     setSaving(true);
     setFormError('');
+
+    if(modal.table==='emprestimos'){
+      const idUsuario=Number(form.id_usuario);
+      const idLivro=Number(form.id_livro);
+      if(!idUsuario||!idLivro){
+        setFormError('Escolha o usuário e o livro.');
+        setSaving(false);
+        return;
+      }
+
+      const book=(data.livros||[]).find(x=>Number(x.id)===idLivro);
+      if(!book){
+        setFormError('Livro não encontrado.');
+        setSaving(false);
+        return;
+      }
+      const quantity=Number(book.quantidade||0);
+      if(quantity<=0){
+        setFormError('Esse livro está sem unidades disponíveis.');
+        setSaving(false);
+        return;
+      }
+
+      const payload={
+        id_usuario:idUsuario,
+        id_livro:idLivro,
+        data_emprestimo:localIsoDate(),
+        data_prevista_devolucao:addDaysIso(14),
+        status:'emprestado',
+        data_devolucao:null,
+        id_exemplar:null
+      };
+
+      const{data:created,error:loanError}=await supabase
+        .from('emprestimos')
+        .insert(payload)
+        .select('id')
+        .single();
+
+      if(loanError){
+        setFormError('Não foi possível registrar o empréstimo: '+loanError.message);
+        setSaving(false);
+        return;
+      }
+
+      const{error:stockError}=await supabase
+        .from('livros')
+        .update({quantidade:quantity-1})
+        .eq('id',idLivro);
+
+      if(stockError){
+        if(created?.id) await supabase.from('emprestimos').delete().eq('id',created.id);
+        setFormError('O empréstimo não foi concluído porque o estoque não pôde ser atualizado.');
+        setSaving(false);
+        return;
+      }
+
+      setModal(null);
+      setSaving(false);
+      setNotice('Empréstimo registrado. Devolução prevista para '+formatDate(payload.data_prevista_devolucao)+'.');
+      await load();
+      setTimeout(()=>setNotice(''),4200);
+      return;
+    }
 
     let payload;
     if(modal.table==='livros'){
@@ -241,6 +359,76 @@ export default function Home(){
     setTimeout(()=>setNotice(''),2500);
   }
 
+  async function returnLoan(row){
+    if(isLoanReturned(row)) return;
+
+    const user=relationLabel('id_usuario',row.id_usuario,data);
+    const book=relationLabel('id_livro',row.id_livro,data);
+    if(!confirm('Registrar a devolução de "'+book+'" por '+user+'?')) return;
+
+    setSaving(true);
+    const previousStatus=row.status;
+    const previousReturn=row.data_devolucao??null;
+
+    const{error:loanError}=await supabase
+      .from('emprestimos')
+      .update({status:'devolvido',data_devolucao:localIsoDate()})
+      .eq('id',row.id);
+
+    if(loanError){
+      setSaving(false);
+      setNotice('Não foi possível registrar a devolução: '+loanError.message);
+      setTimeout(()=>setNotice(''),4500);
+      return;
+    }
+
+    let bookId=row.id_livro;
+    if(bookId==null&&row.id_exemplar!=null){
+      const copy=(data.exemplares||[]).find(x=>Number(x.id)===Number(row.id_exemplar));
+      bookId=copy?.id_livro??null;
+    }
+
+    if(bookId!=null){
+      const{data:bookRow,error:readError}=await supabase
+        .from('livros')
+        .select('quantidade')
+        .eq('id',bookId)
+        .single();
+
+      if(readError||!bookRow){
+        await supabase.from('emprestimos').update({
+          status:previousStatus,
+          data_devolucao:previousReturn
+        }).eq('id',row.id);
+        setSaving(false);
+        setNotice('A devolução foi cancelada porque não foi possível consultar o estoque do livro.');
+        setTimeout(()=>setNotice(''),4500);
+        return;
+      }
+
+      const{error:stockError}=await supabase
+        .from('livros')
+        .update({quantidade:Number(bookRow.quantidade||0)+1})
+        .eq('id',bookId);
+
+      if(stockError){
+        await supabase.from('emprestimos').update({
+          status:previousStatus,
+          data_devolucao:previousReturn
+        }).eq('id',row.id);
+        setSaving(false);
+        setNotice('A devolução foi cancelada porque o estoque não pôde ser atualizado.');
+        setTimeout(()=>setNotice(''),4500);
+        return;
+      }
+    }
+
+    setSaving(false);
+    setNotice('Devolução registrada com sucesso.');
+    await load();
+    setTimeout(()=>setNotice(''),3000);
+  }
+
   async function remove(row){
     const item=tab==='livros'?row.titulo:row.nome;
     if(!confirm('Excluir "'+item+'"? Essa ação não pode ser desfeita.')) return;
@@ -286,6 +474,11 @@ export default function Home(){
     </aside>
 
     <section className="content">
+      <div className="mobile-brand">
+        <div className="mobile-logo"><BookOpen size={18}/><span>DS</span></div>
+        <div><strong>Biblioteca DS</strong><span>2º DS • ETEC</span></div>
+      </div>
+
       <header>
         <div>
           <p>Sistema de gerenciamento</p>
@@ -351,12 +544,24 @@ export default function Home(){
           </div>
           <div className="toolbar-actions">
             <label><Search size={17}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder={'Pesquisar em '+(sections.find(x=>x[1]===tab)?.[0]||'registros').toLowerCase()+'...'}/></label>
-            {editable&&<button className="primary" onClick={openNew}><Plus size={18}/>{tab==='livros'?'Novo livro':'Novo usuário'}</button>}
+            {tab==='emprestimos'&&<>
+              <select className="toolbar-select" value={loanFilter} onChange={e=>setLoanFilter(e.target.value)} aria-label="Filtrar empréstimos">
+                <option value="todos">Todos</option>
+                <option value="abertos">Em aberto</option>
+                <option value="devolvidos">Devolvidos</option>
+                <option value="atrasados">Atrasados</option>
+              </select>
+              <select className="toolbar-select user-filter" value={loanUser} onChange={e=>setLoanUser(e.target.value)} aria-label="Filtrar por usuário">
+                <option value="">Todos os usuários</option>
+                {(data.usuarios||[]).map(user=><option key={user.id} value={user.id}>{user.nome||user.usuario}</option>)}
+              </select>
+            </>}
+            {(editable||tab==='emprestimos')&&<button className="primary" onClick={openNew}><Plus size={18}/>{tab==='livros'?'Novo livro':tab==='usuarios'?'Novo usuário':'Novo empréstimo'}</button>}
           </div>
         </div>
 
         {loading?<EmptyState loading text="Carregando dados..."/>:filtered.length?
-          <Table rows={filtered} data={data} editable={editable} onEdit={openEdit} onDelete={remove}/>
+          <Table table={tab} rows={filtered} data={data} editable={editable} onEdit={openEdit} onDelete={remove} onReturn={returnLoan} saving={saving}/>
           :<EmptyState text={q?'Nenhum resultado para essa busca.':'Nenhum registro encontrado.'}/>}
       </div>}
 
@@ -366,6 +571,8 @@ export default function Home(){
         setForm={setForm}
         categories={data.categorias||[]}
         publishers={data.editoras||[]}
+        users={data.usuarios||[]}
+        books={data.livros||[]}
         saving={saving}
         error={formError}
         onClose={()=>setModal(null)}
@@ -423,33 +630,65 @@ function EmptyState({text,loading=false,compact=false}){
   </div>;
 }
 
-function Table({rows,data,editable,onEdit,onDelete}){
+function Table({table,rows,data,editable,onEdit,onDelete,onReturn,saving}){
   const keys=Object.keys(rows[0]||{}).filter(k=>k!=='senha');
+  const hasActions=editable||table==='emprestimos';
   return <div className="tablewrap"><table>
-    <thead><tr>{keys.map(k=><th key={k}>{labels[k]||k.replaceAll('_',' ')}</th>)}{editable&&<th>Ações</th>}</tr></thead>
+    <thead><tr>{keys.map(k=><th key={k}>{labels[k]||k.replaceAll('_',' ')}</th>)}{hasActions&&<th>Ações</th>}</tr></thead>
     <tbody>{rows.map((row,i)=><tr key={row.id??i}>
       {keys.map(key=><td key={key}>
         {key==='status'?<StatusBadge value={row[key]}/>:displayValue(key,row[key],data)}
       </td>)}
-      {editable&&<td><div className="row-actions">
-        <button className="icon-btn" title="Editar" aria-label="Editar" onClick={()=>onEdit(row)}><Pencil size={15}/></button>
-        <button className="icon-btn danger" title="Excluir" aria-label="Excluir" onClick={()=>onDelete(row)}><Trash2 size={15}/></button>
+      {hasActions&&<td><div className="row-actions">
+        {editable&&<>
+          <button className="icon-btn" title="Editar" aria-label="Editar" onClick={()=>onEdit(row)}><Pencil size={15}/></button>
+          <button className="icon-btn danger" title="Excluir" aria-label="Excluir" onClick={()=>onDelete(row)}><Trash2 size={15}/></button>
+        </>}
+        {table==='emprestimos'&&!isLoanReturned(row)&&
+          <button className="icon-btn success" disabled={saving} title="Registrar devolução" aria-label="Registrar devolução" onClick={()=>onReturn(row)}>
+            <CheckCircle2 size={16}/>
+          </button>}
       </div></td>}
     </tr>)}</tbody>
   </table></div>;
 }
 
-function EditorModal({modal,form,setForm,categories,publishers,saving,error,onClose,onSave}){
+function EditorModal({modal,form,setForm,categories,publishers,users,books,saving,error,onClose,onSave}){
   const book=modal.table==='livros';
+  const loan=modal.table==='emprestimos';
   const update=(field,value)=>setForm(f=>({...f,[field]:value}));
+  const selectedBook=loan?books.find(x=>String(x.id)===String(form.id_livro)):null;
+  const title=loan?'Novo empréstimo':book?(modal.mode==='new'?'Novo livro':'Editar livro'):(modal.mode==='new'?'Novo usuário':'Editar usuário');
   return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
     <div className="modal">
       <div className="modal-head">
-        <div><span>{modal.mode==='new'?'CADASTRO':'EDIÇÃO'}</span><h2>{book?(modal.mode==='new'?'Novo livro':'Editar livro'):(modal.mode==='new'?'Novo usuário':'Editar usuário')}</h2></div>
+        <div><span>{loan?'CIRCULAÇÃO':modal.mode==='new'?'CADASTRO':'EDIÇÃO'}</span><h2>{title}</h2></div>
         <button className="close-btn" onClick={onClose} aria-label="Fechar"><X size={20}/></button>
       </div>
       <form onSubmit={onSave}>
-        {book?<>
+        {loan?<>
+          <div className="field full">
+            <label>Usuário</label>
+            <select value={form.id_usuario||''} onChange={e=>update('id_usuario',e.target.value)}>
+              <option value="">Selecione quem vai retirar</option>
+              {users.map(user=><option key={user.id} value={user.id}>{user.nome||user.usuario}</option>)}
+            </select>
+          </div>
+          <div className="field full">
+            <label>Livro</label>
+            <select value={form.id_livro||''} onChange={e=>update('id_livro',e.target.value)}>
+              <option value="">Selecione um livro</option>
+              {books.map(item=><option key={item.id} value={item.id} disabled={Number(item.quantidade||0)<=0}>
+                {item.titulo} — {Number(item.quantidade||0)>0?item.quantidade+' disponível(is)':'sem estoque'}
+              </option>)}
+            </select>
+          </div>
+          <div className="loan-summary">
+            <div><span>Prazo</span><strong>14 dias</strong></div>
+            <div><span>Devolução prevista</span><strong>{formatDate(addDaysIso(14))}</strong></div>
+            <div><span>Preço do aluguel</span><strong>{selectedBook?formatMoney(selectedBook.preco):'—'}</strong></div>
+          </div>
+        </>:book?<>
           <div className="field full"><label>Título</label><input value={form.titulo||''} onChange={e=>update('titulo',e.target.value)} placeholder="Ex.: Dom Casmurro"/></div>
           <div className="field full"><label>Autor</label><input value={form.autor||''} onChange={e=>update('autor',e.target.value)} placeholder="Nome do autor"/></div>
           <div className="form-grid">
