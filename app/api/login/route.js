@@ -8,27 +8,20 @@ function getClient(){
   return createClient(url,key,{auth:{persistSession:false}});
 }
 
-function normalizeRole(user){
-  const raw=String(
-    user?.tipo ??
-    user?.role ??
-    user?.perfil ??
-    user?.nivel_acesso ??
-    user?.nivel ??
-    ''
-  ).trim().toLowerCase();
-
-  const adminValues=new Set(['admin','adm','administrador','administradora']);
-  const username=String(user?.usuario||'').trim().toLowerCase();
-
-  return adminValues.has(raw)||adminValues.has(username)?'admin':'user';
+function displayName(value){
+  return String(value||'Usuário')
+    .replace(/[._-]+/g,' ')
+    .replace(/\b\w/g,letter=>letter.toUpperCase())
+    .trim()||'Usuário';
 }
 
-async function findUser(supabase,login){
+async function resolveDemoUser(supabase,email){
+  const localPart=email.split('@')[0];
+
   let result=await supabase
     .from('usuarios')
-    .select('*')
-    .eq('usuario',login)
+    .select('id,nome,email,usuario')
+    .eq('email',email)
     .limit(1)
     .maybeSingle();
 
@@ -37,8 +30,18 @@ async function findUser(supabase,login){
 
   result=await supabase
     .from('usuarios')
-    .select('*')
-    .eq('email',login)
+    .select('id,nome,email,usuario')
+    .eq('usuario',localPart)
+    .limit(1)
+    .maybeSingle();
+
+  if(result.error) throw result.error;
+  if(result.data) return result.data;
+
+  result=await supabase
+    .from('usuarios')
+    .select('id,nome,email,usuario')
+    .order('id',{ascending:true})
     .limit(1)
     .maybeSingle();
 
@@ -49,31 +52,53 @@ async function findUser(supabase,login){
 export async function POST(request){
   try{
     const body=await request.json();
-    const login=String(body?.login||'').trim();
+    const email=String(body?.login||'').trim().toLowerCase();
     const password=String(body?.password||'');
 
-    if(!login||!password){
-      return NextResponse.json({error:'Preencha usuário/e-mail e senha.'},{status:400});
+    if(!email||!password){
+      return NextResponse.json({error:'Preencha o e-mail e a senha.'},{status:400});
     }
 
-    const supabase=getClient();
-    const user=await findUser(supabase,login);
-
-    if(!user||String(user.senha??'')!==password){
-      return NextResponse.json({error:'Usuário ou senha incorretos.'},{status:401});
+    if(!email.includes('@')){
+      return NextResponse.json({
+        error:'Use um e-mail: @gmail.com para administrador ou @email.com para usuário.'
+      },{status:400});
     }
 
-    const role=normalizeRole(user);
+    if(email.endsWith('@gmail.com')){
+      const localPart=email.split('@')[0];
+      return NextResponse.json({
+        user:{
+          id:null,
+          nome:displayName(localPart),
+          email,
+          usuario:localPart,
+          role:'admin',
+          demo:true
+        }
+      });
+    }
+
+    if(email.endsWith('@email.com')){
+      const supabase=getClient();
+      const dbUser=await resolveDemoUser(supabase,email);
+      const localPart=email.split('@')[0];
+
+      return NextResponse.json({
+        user:{
+          id:dbUser?.id??null,
+          nome:dbUser?.nome||displayName(localPart),
+          email,
+          usuario:dbUser?.usuario||localPart,
+          role:'user',
+          demo:true
+        }
+      });
+    }
 
     return NextResponse.json({
-      user:{
-        id:user.id,
-        nome:user.nome||user.usuario||'Usuário',
-        email:user.email||'',
-        usuario:user.usuario||'',
-        role
-      }
-    });
+      error:'Domínio inválido. Use @gmail.com para administrador ou @email.com para usuário.'
+    },{status:401});
   }catch(error){
     console.error('Login error:',error);
     return NextResponse.json({error:'Não foi possível entrar agora. Tente novamente.'},{status:500});
