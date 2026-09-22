@@ -47,7 +47,7 @@ export default function Home(){
     setLoading(true);
     const names=sections.slice(1).map(x=>x[1]);
     const res=await Promise.all(names.map(async t=>{
-      const{data,error}=await supabase.from(t).select('*').order('id',{ascending:false}).limit(250);
+      const{data,error}=await supabase.from(t).select('*').order('id',{ascending:true}).limit(250);
       return[t,data||[],error];
     }));
     setData(Object.fromEntries(res.map(([t,d])=>[t,d])));
