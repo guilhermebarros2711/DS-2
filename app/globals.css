@@ -116,6 +116,21 @@ nav button.active:before{
 .foot small{display:block;width:100%;color:#5f6e84;margin-left:14px}
 .connection-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px #22c55e16}
 
+.mobile-brand{display:none}
+.mobile-logo{
+  position:relative;
+  width:38px;height:38px;border-radius:11px;
+  background:linear-gradient(145deg,#3b82f6,#1d4ed8);
+  color:#fff;display:grid;place-items:center;
+  box-shadow:0 8px 18px #2563eb2d;
+}
+.mobile-logo>span{
+  position:absolute;right:-4px;bottom:-4px;
+  min-width:18px;height:18px;padding:0 3px;border-radius:6px;
+  background:#fff;color:#1d4ed8;border:2px solid #f5f7fb;
+  display:grid;place-items:center;font-size:7px;font-weight:900;
+}
+
 .content{padding:32px 38px 46px;min-width:0;max-width:1600px;width:100%;margin:0 auto}
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px;gap:18px}
 header p{margin:0;color:#8a96a8;font-size:12px;font-weight:600}
@@ -338,6 +353,19 @@ h1{margin:3px 0 0;font-size:29px;letter-spacing:-.65px}
 .toolbar label:focus-within{border-color:#93c5fd;box-shadow:0 0 0 3px #dbeafe80}
 .toolbar input{border:0;outline:0;padding:9px 0;width:235px;font-size:12px;color:#172033}
 .toolbar input::placeholder{color:#a3adbb}
+.toolbar-select{
+  border:1px solid #dce2eb;
+  background:#fff;
+  color:#475569;
+  border-radius:9px;
+  padding:9px 30px 9px 10px;
+  outline:0;
+  font-size:11px;
+  font-weight:700;
+  min-height:38px;
+}
+.toolbar-select:focus{border-color:#93c5fd;box-shadow:0 0 0 3px #dbeafe80}
+.toolbar-select.user-filter{max-width:180px}
 
 .tablewrap{overflow:auto;border:1px solid #e8ecf2;border-radius:11px}
 table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
@@ -350,6 +378,9 @@ tbody tr:hover{background:#f8fbff}
 .icon-btn:hover{background:#dbeafe}
 .icon-btn.danger{background:#fef2f2;color:#dc2626}
 .icon-btn.danger:hover{background:#fee2e2}
+.icon-btn.success{background:#ecfdf3;color:#16a34a}
+.icon-btn.success:hover{background:#dcfce7}
+.icon-btn:disabled{opacity:.55;cursor:wait}
 
 .empty{
   text-align:center;
@@ -397,6 +428,18 @@ form{display:flex;flex-direction:column;gap:14px}
 }
 .field input:focus,.field select:focus{border-color:#60a5fa;box-shadow:0 0 0 3px #dbeafe}
 .form-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:10px 12px;border-radius:9px;font-size:11px}
+.loan-summary{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:9px;
+  padding:12px;
+  border-radius:11px;
+  background:#f8fafc;
+  border:1px solid #e7ebf1;
+}
+.loan-summary>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.loan-summary span{font-size:9px;color:#8a96a8;font-weight:700}
+.loan-summary strong{font-size:11px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:4px}
 
 .spin{animation:spin .85s linear infinite}
@@ -422,6 +465,7 @@ form{display:flex;flex-direction:column;gap:14px}
   .toolbar-actions{width:100%;flex-wrap:wrap}
   .toolbar-actions label{flex:1;min-width:180px}
   .toolbar-actions label input{width:100%}
+  .toolbar-select{flex:1}
   .hero{min-height:180px}
 }
 
@@ -438,6 +482,15 @@ form{display:flex;flex-direction:column;gap:14px}
     border-top:1px solid #ffffff12;
   }
   .brand,.foot,.nav-label{display:none}
+  .mobile-brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin:0 0 18px 2px;
+  }
+  .mobile-brand>div:last-child{display:flex;flex-direction:column;gap:1px}
+  .mobile-brand strong{font-size:13px;letter-spacing:-.15px}
+  .mobile-brand>div:last-child>span{font-size:9px;color:#8a96a8;font-weight:650}
   nav{
     height:100%;
     flex-direction:row;
@@ -468,8 +521,9 @@ form{display:flex;flex-direction:column;gap:14px}
   .hero-mark{display:none}
   .toolbar{gap:12px}
   .toolbar-actions{display:grid;grid-template-columns:1fr;width:100%}
-  .toolbar label,.toolbar input,.toolbar .primary{width:100%}
+  .toolbar label,.toolbar input,.toolbar .primary,.toolbar-select{width:100%;max-width:none}
   .form-grid{grid-template-columns:1fr}
+  .loan-summary{grid-template-columns:1fr}
   .modal{padding:18px}
   .modal-actions{display:grid;grid-template-columns:1fr 1fr}
   .activity-meta small{display:none}
