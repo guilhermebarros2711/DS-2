@@ -742,3 +742,84 @@ form{display:flex;flex-direction:column;gap:14px}
 .login-role-note>div:last-child{display:flex;flex-direction:column;gap:1px}
 .login-role-note strong{font-size:10px}
 .login-role-note span{font-size:9px;color:#8a96a8}
+
+
+/* Login responsivo — regras finais para vencer a cascata das regras desktop */
+@media (max-width:760px){
+  .login-page{
+    min-height:100dvh;
+    display:block;
+    padding:0;
+    background:#f5f7fb;
+    overflow-x:hidden;
+  }
+  .login-shell{
+    width:100%;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    grid-template-columns:none;
+    border:0;
+    border-radius:0;
+    box-shadow:none;
+    overflow:visible;
+  }
+  .login-showcase{
+    min-height:auto;
+    padding:22px 20px 26px;
+    border-radius:0 0 26px 26px;
+    flex:0 0 auto;
+  }
+  .login-showcase:before{
+    width:260px;
+    height:260px;
+    right:-120px;
+    top:-80px;
+  }
+  .login-brand{gap:10px}
+  .login-logo{width:40px;height:40px;border-radius:12px}
+  .login-message{
+    margin:34px 0 0;
+    max-width:none;
+  }
+  .login-kicker{font-size:8px}
+  .login-message h1{
+    margin:8px 0 6px;
+    font-size:30px;
+    line-height:1.05;
+    letter-spacing:-.8px;
+  }
+  .login-message p{
+    max-width:430px;
+    font-size:11px;
+    line-height:1.5;
+  }
+  .login-feature-grid{display:none}
+  .login-card{
+    width:100%;
+    min-width:0;
+    padding:27px 20px 34px;
+    justify-content:flex-start;
+    flex:1;
+  }
+  .login-card-head h2{
+    font-size:24px;
+    line-height:1.12;
+  }
+  .login-form{margin:22px 0 18px}
+  .login-input{width:100%;min-width:0}
+  .login-input input{width:100%;min-width:0}
+  .login-submit{width:100%}
+  .login-role-note{padding:9px 0}
+}
+
+@media (max-width:390px){
+  .login-showcase{
+    padding:19px 17px 22px;
+    border-radius:0 0 22px 22px;
+  }
+  .login-message{margin-top:27px}
+  .login-message h1{font-size:27px}
+  .login-card{padding:24px 17px 30px}
+  .login-card-head h2{font-size:22px}
+}
