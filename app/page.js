@@ -220,6 +220,9 @@ export default function Home(){
 
   function handleLogin(user){
     localStorage.setItem('biblioteca_session',JSON.stringify(user));
+    if(user?.role==='user'&&user?.id!=null){
+      localStorage.setItem('biblioteca_last_demo_user_id',String(user.id));
+    }
     setSession(user);
     setTab('dashboard');
     setQ('');
@@ -816,10 +819,11 @@ function LoginScreen({onLogin}){
     setError('');
 
     try{
+      const previousUserId=localStorage.getItem('biblioteca_last_demo_user_id');
       const response=await fetch('/api/login',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({login,password})
+        body:JSON.stringify({login,password,previousUserId})
       });
       const result=await response.json();
 
