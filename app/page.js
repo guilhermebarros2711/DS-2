@@ -5,7 +5,7 @@ import {
   BookOpen,Users,BookCopy,CalendarClock,TriangleAlert,Star,Tags,Building2,Boxes,History,
   LayoutDashboard,Search,RefreshCw,Plus,Pencil,Trash2,X,ArrowUpRight,Clock3,LibraryBig,
   CheckCircle2,CircleDollarSign,Sparkles,Eye,EyeOff,LogOut,ShieldCheck,UserRound,
-  LockKeyhole,AtSign
+  LockKeyhole,AtSign,Trophy,Gauge,BookMarked,Medal
 } from 'lucide-react';
 
 const navGroups=[
@@ -40,7 +40,8 @@ const labels={
   data_emprestimo:'Empréstimo',data_devolucao:'Devolução',
   data_prevista_devolucao:'Prev. devolução',data_reserva:'Reserva',
   data_expiracao:'Expiração',data_multa:'Data',data_pagamento:'Pagamento',
-  data_avaliacao:'Data',data_acao:'Data'
+  data_avaliacao:'Data',data_acao:'Data',
+  nota_sistema:'Nota do sistema',limite_emprestimos:'Empréstimos ativos / limite'
 };
 
 const dateFields=new Set([
@@ -87,6 +88,69 @@ function addDaysIso(days){
   date.setHours(12,0,0,0);
   date.setDate(date.getDate()+days);
   return localIsoDate(date);
+}
+
+function isReturnedLate(loan){
+  if(!isLoanReturned(loan)||!loan?.data_prevista_devolucao||!loan?.data_devolucao) return false;
+  return String(loan.data_devolucao).slice(0,10)>String(loan.data_prevista_devolucao).slice(0,10);
+}
+
+function scoreLabel(score){
+  if(score>=8) return 'Excelente';
+  if(score>=6) return 'Boa';
+  if(score>=4) return 'Baixa';
+  return 'Crítica';
+}
+
+function scoreTone(score){
+  if(score>=8) return 'excellent';
+  if(score>=6) return 'good';
+  if(score>=4) return 'low';
+  return 'critical';
+}
+
+function loanLimitFromScore(score){
+  if(score>=8) return 5;
+  if(score>=6) return 4;
+  if(score>=4) return 2;
+  return 1;
+}
+
+function getUserMetrics(userId,data){
+  const id=Number(userId);
+  const userLoans=(data.emprestimos||[]).filter(loan=>Number(loan.id_usuario)===id);
+  const activeLoans=userLoans.filter(loan=>!isLoanReturned(loan));
+  const openOverdue=activeLoans.filter(isLoanOverdue).length;
+  const lateReturns=userLoans.filter(isReturnedLate).length;
+  const pendingFines=(data.multas||[]).filter(fine=>
+    Number(fine.id_usuario)===id &&
+    !['paga','pago','quitada','quitado'].includes(normalizeStatus(fine.status))
+  ).length;
+
+  const rawScore=10-(openOverdue*2)-(lateReturns*1)-(pendingFines*1);
+  const score=Math.max(0,Math.min(10,Math.round(rawScore*10)/10));
+  const limit=loanLimitFromScore(score);
+
+  return {
+    score,
+    label:scoreLabel(score),
+    tone:scoreTone(score),
+    limit,
+    active:activeLoans.length,
+    openOverdue,
+    lateReturns,
+    pendingFines,
+    blocked:activeLoans.length>=limit
+  };
+}
+
+function resolveLoanBookId(loan,data){
+  if(loan?.id_livro!=null) return Number(loan.id_livro);
+  if(loan?.id_exemplar!=null){
+    const copy=(data.exemplares||[]).find(item=>Number(item.id)===Number(loan.id_exemplar));
+    if(copy?.id_livro!=null) return Number(copy.id_livro);
+  }
+  return null;
 }
 
 function statusClass(status=''){
@@ -238,7 +302,16 @@ export default function Home(){
     setNotice('');
   }
 
-  const rows=data[tab]||[];
+  const rows=tab==='usuarios'
+    ?(data.usuarios||[]).map(user=>{
+      const metrics=getUserMetrics(user.id,data);
+      return {
+        ...user,
+        nota_sistema:metrics.score,
+        limite_emprestimos:metrics.active+' / '+metrics.limit
+      };
+    })
+    :(data[tab]||[]);
   const filtered=rows.filter(row=>{
     if(tab==='emprestimos'){
       const returned=isLoanReturned(row);
@@ -263,6 +336,25 @@ export default function Home(){
   const recentLoans=useMemo(()=>[...(data.emprestimos||[])]
     .sort((a,b)=>Number(b.id||0)-Number(a.id||0))
     .slice(0,5),[data.emprestimos]);
+
+  const bookRanking=useMemo(()=>{
+    const counts=new Map();
+    for(const loan of data.emprestimos||[]){
+      const bookId=resolveLoanBookId(loan,data);
+      if(bookId==null) continue;
+      counts.set(bookId,(counts.get(bookId)||0)+1);
+    }
+    return [...counts.entries()]
+      .map(([bookId,count])=>({
+        book:(data.livros||[]).find(item=>Number(item.id)===Number(bookId)),
+        bookId,
+        count
+      }))
+      .sort((a,b)=>b.count-a.count);
+  },[data.emprestimos,data.livros,data.exemplares]);
+
+  const mostBorrowed=bookRanking[0]||null;
+  const currentUserMetrics=!isAdmin&&session?.id!=null?getUserMetrics(session.id,data):null;
 
   const totalCopies=(data.exemplares||[]).length;
   const availableCopies=(data.exemplares||[]).filter(x=>['disponivel','disponível'].includes(normalizeStatus(x.status))).length;
@@ -312,6 +404,16 @@ export default function Home(){
       const idLivro=Number(form.id_livro);
       if(!idUsuario||!idLivro){
         setFormError('Escolha o usuário e o livro.');
+        setSaving(false);
+        return;
+      }
+
+      const userMetrics=getUserMetrics(idUsuario,data);
+      if(userMetrics.blocked){
+        setFormError(
+          'Empréstimo bloqueado: este usuário tem nota '+userMetrics.score.toFixed(1)+
+          ' ('+userMetrics.label+') e já atingiu o limite de '+userMetrics.limit+' livro(s) simultâneo(s).'
+        );
         setSaving(false);
         return;
       }
@@ -590,9 +692,10 @@ export default function Home(){
         <div className="cards">
           <Card t="Livros cadastrados" v={(data.livros||[]).length} I={BookOpen} tone="blue"/>
           {isAdmin&&<Card t="Usuários" v={(data.usuarios||[]).length} I={Users} tone="violet"/>}
+          {!isAdmin&&currentUserMetrics&&<Card t="Minha nota" v={currentUserMetrics.score.toFixed(1)} I={Gauge} tone={currentUserMetrics.score>=6?'green':'red'}/>}
           <Card t={isAdmin?'Empréstimos ativos':'Meus empréstimos'} v={active} I={BookCopy} tone="cyan"/>
           <Card t="Atrasados" v={overdue} I={TriangleAlert} tone={overdue?'red':'green'}/>
-          <Card t={isAdmin?'Reservas ativas':'Minhas reservas'} v={activeReservations} I={CalendarClock} tone="amber"/>
+          <Card t={isAdmin?'Reservas ativas':'Meu limite'} v={isAdmin?activeReservations:(currentUserMetrics?.limit??'—')} I={isAdmin?CalendarClock:BookMarked} tone="amber"/>
           <Card t={isAdmin?'Multas pendentes':'Minhas multas'} v={pending} I={CircleDollarSign} tone={pending?'red':'green'}/>
         </div>
 
@@ -619,12 +722,47 @@ export default function Home(){
               <MetricRow label="Pendências financeiras" value={pending} icon={CircleDollarSign}/>
             </>:<>
               <MetricRow label="Empréstimos em aberto" value={active} icon={Clock3}/>
-              <MetricRow label="Empréstimos atrasados" value={overdue} icon={TriangleAlert}/>
-              <MetricRow label="Reservas ativas" value={activeReservations} icon={CalendarClock}/>
+              <MetricRow label="Limite permitido" value={currentUserMetrics?.limit??'—'} icon={BookMarked}/>
+              <MetricRow label="Nota do sistema" value={currentUserMetrics?currentUserMetrics.score.toFixed(1)+'/10':'—'} icon={Gauge}/>
               <MetricRow label="Pendências financeiras" value={pending} icon={CircleDollarSign}/>
             </>}
           </div>
         </div>
+
+        {isAdmin&&<div className="insight-grid">
+          <div className="panel popular-book-panel">
+            <div className="insight-icon"><Trophy size={23}/></div>
+            <div className="insight-copy">
+              <span className="panel-kicker">DESTAQUE DO ACERVO</span>
+              <h3>Livro mais emprestado</h3>
+              <strong>{mostBorrowed?.book?.titulo||'Sem empréstimos ainda'}</strong>
+              <p>{mostBorrowed?mostBorrowed.count+' empréstimo(s) registrado(s)':'O ranking aparece assim que houver movimentação.'}</p>
+            </div>
+          </div>
+
+          <div className="panel score-policy-panel">
+            <div className="panel-head">
+              <div><span className="panel-kicker">AVALIAÇÃO AUTOMÁTICA</span><h3>Regra de empréstimos</h3></div>
+              <Medal size={21}/>
+            </div>
+            <div className="score-policy-list">
+              <span><b>8–10</b> até 5 livros</span>
+              <span><b>6–7,9</b> até 4 livros</span>
+              <span><b>4–5,9</b> até 2 livros</span>
+              <span><b>0–3,9</b> até 1 livro</span>
+            </div>
+            <small>A nota parte de 10 e cai com atrasos, devoluções atrasadas e multas pendentes.</small>
+          </div>
+        </div>}
+
+        {!isAdmin&&currentUserMetrics&&<div className={'user-score-panel '+currentUserMetrics.tone}>
+          <div className="score-circle"><strong>{currentUserMetrics.score.toFixed(1)}</strong><span>/10</span></div>
+          <div>
+            <span className="panel-kicker">AVALIAÇÃO DO SISTEMA</span>
+            <h3>Reputação {currentUserMetrics.label}</h3>
+            <p>Você pode manter até <b>{currentUserMetrics.limit} livro(s)</b> simultaneamente e está com <b>{currentUserMetrics.active}</b> agora.</p>
+          </div>
+        </div>}
       </>:<div className="panel">
         <div className="toolbar">
           <div>
@@ -663,6 +801,7 @@ export default function Home(){
         publishers={data.editoras||[]}
         users={data.usuarios||[]}
         books={data.livros||[]}
+        libraryData={data}
         saving={saving}
         error={formError}
         onClose={()=>setModal(null)}
@@ -712,6 +851,14 @@ function StatusBadge({value}){
   return <span className={'status-badge '+statusClass(value)}>{String(value||'—')}</span>;
 }
 
+
+function ScoreBadge({score}){
+  const value=Number(score)||0;
+  return <span className={'score-badge '+scoreTone(value)}>
+    <Gauge size={12}/>{value.toFixed(1)}
+  </span>;
+}
+
 function EmptyState({text,loading=false,compact=false}){
   return <div className={'empty '+(compact?'compact':'')}>
     <div className="empty-icon">{loading?<RefreshCw size={22} className="spin"/>:<Search size={22}/>}</div>
@@ -727,7 +874,9 @@ function Table({table,rows,data,editable,canReturn,onEdit,onDelete,onReturn,savi
     <thead><tr>{keys.map(k=><th key={k}>{labels[k]||k.replaceAll('_',' ')}</th>)}{hasActions&&<th>Ações</th>}</tr></thead>
     <tbody>{rows.map((row,i)=><tr key={row.id??i}>
       {keys.map(key=><td key={key}>
-        {key==='status'?<StatusBadge value={row[key]}/>:displayValue(key,row[key],data)}
+        {key==='status'?<StatusBadge value={row[key]}/>:
+          key==='nota_sistema'?<ScoreBadge score={Number(row[key])}/>:
+          displayValue(key,row[key],data)}
       </td>)}
       {hasActions&&<td><div className="row-actions">
         {editable&&<>
@@ -743,11 +892,14 @@ function Table({table,rows,data,editable,canReturn,onEdit,onDelete,onReturn,savi
   </table></div>;
 }
 
-function EditorModal({modal,form,setForm,categories,publishers,users,books,saving,error,onClose,onSave}){
+function EditorModal({modal,form,setForm,categories,publishers,users,books,libraryData,saving,error,onClose,onSave}){
   const book=modal.table==='livros';
   const loan=modal.table==='emprestimos';
   const update=(field,value)=>setForm(f=>({...f,[field]:value}));
   const selectedBook=loan?books.find(x=>String(x.id)===String(form.id_livro)):null;
+  const selectedUser=loan?users.find(x=>String(x.id)===String(form.id_usuario)):null;
+  const userMetrics=selectedUser?getUserMetrics(selectedUser.id,libraryData):null;
+  const loanBlocked=Boolean(userMetrics?.blocked);
   const title=loan?'Novo empréstimo':book?(modal.mode==='new'?'Novo livro':'Editar livro'):(modal.mode==='new'?'Novo usuário':'Editar usuário');
   return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
     <div className="modal">
@@ -777,7 +929,13 @@ function EditorModal({modal,form,setForm,categories,publishers,users,books,savin
             <div><span>Prazo</span><strong>14 dias</strong></div>
             <div><span>Devolução prevista</span><strong>{formatDate(addDaysIso(14))}</strong></div>
             <div><span>Preço do aluguel</span><strong>{selectedBook?formatMoney(selectedBook.preco):'—'}</strong></div>
+            <div><span>Nota do usuário</span><strong>{userMetrics?userMetrics.score.toFixed(1)+'/10':'—'}</strong></div>
+            <div><span>Empréstimos ativos</span><strong>{userMetrics?userMetrics.active:'—'}</strong></div>
+            <div><span>Limite permitido</span><strong>{userMetrics?userMetrics.limit:'—'}</strong></div>
           </div>
+          {loanBlocked&&<div className="form-error">
+            Limite atingido. Com nota {userMetrics.score.toFixed(1)} ({userMetrics.label}), este usuário pode manter no máximo {userMetrics.limit} livro(s) ao mesmo tempo.
+          </div>}
         </>:book?<>
           <div className="field full"><label>Título</label><input value={form.titulo||''} onChange={e=>update('titulo',e.target.value)} placeholder="Ex.: Dom Casmurro"/></div>
           <div className="field full"><label>Autor</label><input value={form.autor||''} onChange={e=>update('autor',e.target.value)} placeholder="Nome do autor"/></div>
@@ -798,7 +956,7 @@ function EditorModal({modal,form,setForm,categories,publishers,users,books,savin
         {error&&<div className="form-error">{error}</div>}
         <div className="modal-actions">
           <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
-          <button className="primary" disabled={saving}>{saving?'Salvando...':'Salvar'}</button>
+          <button className="primary" disabled={saving||loanBlocked}>{saving?'Salvando...':loan&&loanBlocked?'Limite atingido':'Salvar'}</button>
         </div>
       </form>
     </div>
