@@ -64,13 +64,15 @@ function statusClass(status=''){
 
 function formatDate(value){
   if(!value) return '—';
+  const raw=String(value);
+  if(/^\\d{4}-\\d{2}-\\d{2}$/.test(raw)){
+    const [year,month,day]=raw.split('-');
+    return day+'/'+month+'/'+year;
+  }
   const date=new Date(value);
-  if(Number.isNaN(date.getTime())) return String(value);
-  const hasTime=String(value).includes('T');
-  return new Intl.DateTimeFormat('pt-BR',hasTime?{
+  if(Number.isNaN(date.getTime())) return raw;
+  return new Intl.DateTimeFormat('pt-BR',{
     day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'
-  }:{
-    day:'2-digit',month:'2-digit',year:'numeric'
   }).format(date);
 }
 
