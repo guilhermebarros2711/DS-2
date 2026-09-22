@@ -15,38 +15,22 @@ function displayName(value){
     .trim()||'Usuário';
 }
 
-async function resolveDemoUser(supabase,email){
-  const localPart=email.split('@')[0];
-
-  let result=await supabase
-    .from('usuarios')
-    .select('id,nome,email,usuario')
-    .eq('email',email)
-    .limit(1)
-    .maybeSingle();
-
-  if(result.error) throw result.error;
-  if(result.data) return result.data;
-
-  result=await supabase
-    .from('usuarios')
-    .select('id,nome,email,usuario')
-    .eq('usuario',localPart)
-    .limit(1)
-    .maybeSingle();
-
-  if(result.error) throw result.error;
-  if(result.data) return result.data;
-
-  result=await supabase
+async function randomDemoUser(supabase,previousUserId){
+  const {data,error}=await supabase
     .from('usuarios')
     .select('id,nome,email,usuario')
     .order('id',{ascending:true})
-    .limit(1)
-    .maybeSingle();
+    .limit(250);
 
-  if(result.error) throw result.error;
-  return result.data;
+  if(error) throw error;
+  if(!data?.length) return null;
+
+  const previous=Number(previousUserId);
+  const pool=data.length>1 && Number.isFinite(previous)
+    ?data.filter(user=>Number(user.id)!==previous)
+    :data;
+
+  return pool[Math.floor(Math.random()*pool.length)]||data[0];
 }
 
 export async function POST(request){
@@ -54,6 +38,7 @@ export async function POST(request){
     const body=await request.json();
     const email=String(body?.login||'').trim().toLowerCase();
     const password=String(body?.password||'');
+    const previousUserId=body?.previousUserId;
 
     if(!email||!password){
       return NextResponse.json({error:'Preencha o e-mail e a senha.'},{status:400});
@@ -81,15 +66,21 @@ export async function POST(request){
 
     if(email.endsWith('@email.com')){
       const supabase=getClient();
-      const dbUser=await resolveDemoUser(supabase,email);
+      const dbUser=await randomDemoUser(supabase,previousUserId);
       const localPart=email.split('@')[0];
+
+      if(!dbUser){
+        return NextResponse.json({
+          error:'Não há usuários cadastrados para o modo de demonstração.'
+        },{status:404});
+      }
 
       return NextResponse.json({
         user:{
-          id:dbUser?.id??null,
-          nome:dbUser?.nome||displayName(localPart),
-          email,
-          usuario:dbUser?.usuario||localPart,
+          id:dbUser.id,
+          nome:dbUser.nome||displayName(localPart),
+          email:dbUser.email||email,
+          usuario:dbUser.usuario||localPart,
           role:'user',
           demo:true
         }
