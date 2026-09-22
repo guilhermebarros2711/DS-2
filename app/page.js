@@ -901,6 +901,11 @@ function LoginScreen({onLogin}){
 
           {error&&<div className="login-error">{error}</div>}
 
+          <div className="login-demo-note">
+            <Sparkles size={15}/>
+            <span><strong>Modo demonstração:</strong> acessos com @email.com entram em um usuário aleatório cadastrado.</span>
+          </div>
+
           <button className="login-submit" disabled={loading}>
             {loading?<><RefreshCw size={17} className="spin"/> Entrando...</>:<>Entrar <ArrowUpRight size={17}/></>}
           </button>
